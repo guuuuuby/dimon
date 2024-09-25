@@ -3,9 +3,16 @@ import websockets
 import mss
 import numpy as np
 import cv2
+import json
 
 async def capture_and_send():
-    uri = 'ws://localhost:8765'  # WebSocket server URI
+    websocket_accept = await websockets.connect('ws://localhost:8000/accept')
+    message = await websocket_accept.recv()
+    data = json.loads(message)
+    session_id = data['id']
+    print(f"Session ID: {session_id}")
+
+    uri = f'ws://localhost:8001/{session_id}'  # WebSocket server URI
     async with websockets.connect(uri) as websocket:
         with mss.mss() as sct:
             monitor = sct.monitors[1]  # Capture the first monitor
