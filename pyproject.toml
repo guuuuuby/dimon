@@ -4,4 +4,16 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "aiortc>=1.9.0",
+    "av>=12.3.0",
+    "fastapi>=0.115.0",
+    "mss>=9.0.2",
+    "numpy>=2.1.1",
+    "opencv-python>=4.10.0.84",
+    "pillow>=10.4.0",
+    "pyrtmp>=0.3.1",
+    "rich>=13.8.1",
+    "uvicorn>=0.30.6",
+    "websockets>=13.1",
+]
