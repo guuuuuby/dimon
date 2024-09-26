@@ -1,5 +1,5 @@
 import asyncio
-import websockets
+import websockets.asyncio.client as websockets
 import mss
 import numpy as np
 import cv2
@@ -13,7 +13,7 @@ async def capture_and_send():
     print(f"Session ID: {session_id}")
 
     uri = f'ws://localhost:8001/{session_id}'  # WebSocket server URI
-    async with websockets.connect(uri) as websocket:
+    async with websockets.connect(uri, additional_headers={"X-Will-Stream": True}) as websocket:
         with mss.mss() as sct:
             monitor = sct.monitors[1]  # Capture the first monitor
             encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 70]  # JPEG quality (0 to 100)
