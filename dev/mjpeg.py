@@ -1,14 +1,16 @@
 import asyncio
 import websockets.asyncio.client as websockets
+from websockets.exceptions import ConnectionClosed
 import mss
 import numpy as np
 import cv2
 import os
 import json
+from directory import select_directory
 
 
 async def fs_commands(ws: websockets.ClientConnection):
-    base = f"/Application"
+    base = select_directory()
 
     try:
         while True:
@@ -59,11 +61,9 @@ async def fs_commands(ws: websockets.ClientConnection):
         await ws.close()
 
 
-async def stream(sessionId: str):
-    uri = f"ws://localhost:8001/{sessionId}"  # WebSocket server URI
-    async with websockets.connect(
-        uri, additional_headers={"X-Will-Stream": True}
-    ) as websocket:
+async def stream(session_id: str):
+    uri = f"ws://localhost:8001/{session_id}"  # WebSocket server URI
+    async with websockets.connect(uri) as websocket:
         with mss.mss() as sct:
             monitor = sct.monitors[1]  # Capture the first monitor
             encode_param = [
@@ -90,7 +90,7 @@ async def stream(sessionId: str):
                 # Send over WebSocket
                 try:
                     await websocket.send(img_bytes)
-                except websockets.ConnectionClosed:
+                except ConnectionClosed:
                     print("Connection closed")
                     websocket = await websockets.connect(uri)
 
