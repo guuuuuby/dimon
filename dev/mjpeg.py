@@ -8,7 +8,7 @@ import json
 
 
 async def fs_commands(ws: websockets.ClientConnection):
-    base = f"/Users/cactus"
+    base = f"/Application"
 
     try:
         while True:
