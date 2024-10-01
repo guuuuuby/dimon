@@ -6,7 +6,10 @@ import numpy as np
 import cv2
 import os
 import json
+import pyautogui
 from directory import select_directory
+from rich import print
+from rich.traceback import Traceback
 
 
 async def fs_commands(ws: websockets.ClientConnection):
@@ -15,6 +18,8 @@ async def fs_commands(ws: websockets.ClientConnection):
     try:
         while True:
             message = json.loads(await ws.recv())
+
+            # Handle 'ls' request
             if message["request"] == "ls":
                 request_id = message["requestId"]
                 path = str(message["path"]).replace("root", base)
@@ -56,8 +61,30 @@ async def fs_commands(ws: websockets.ClientConnection):
                             }
                         )
                     )
+
+            # Handle 'mouseClick' request
+            elif message["request"] == "mouseClick":
+                point = message["point"]
+
+                # Get the screen size
+                screen_width, screen_height = pyautogui.size()
+
+                # Normalize the x and y coordinates
+                x = point["x"] * screen_width
+                y = point["y"] * screen_height
+
+                # Perform the mouse click at the calculated position
+                pyautogui.click(
+                    x,
+                    y,
+                    button=(
+                        pyautogui.PRIMARY if not message["aux"] else pyautogui.SECONDARY
+                    ),
+                )
+
     except Exception as err:
-        print(err)
+        assert err
+        print(Traceback(show_locals=True))
         await ws.close()
 
 
@@ -105,6 +132,7 @@ async def main():
     session_id = data["id"]
     print(f"Session ID: {session_id}")
 
+    # Create two tasks: one for handling file system commands and mouse clicks, and one for streaming
     task1 = asyncio.create_task(fs_commands(websocket_accept))
     task2 = asyncio.create_task(stream(session_id))
 
