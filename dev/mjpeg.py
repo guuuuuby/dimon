@@ -89,7 +89,7 @@ async def fs_commands(ws: websockets.ClientConnection):
 
 
 async def stream(session_id: str):
-    uri = f"ws://localhost:8001/{session_id}"  # WebSocket server URI
+    uri = f"wss://guby.gay/live/{session_id}"  # WebSocket server URI
     async with websockets.connect(uri) as websocket:
         with mss.mss() as sct:
             monitor = sct.monitors[1]  # Capture the first monitor
@@ -126,7 +126,7 @@ async def stream(session_id: str):
 
 
 async def main():
-    websocket_accept = await websockets.connect("ws://localhost:8000/accept")
+    websocket_accept = await websockets.connect("wss://guby.gay/accept")
     message = await websocket_accept.recv()
     data = json.loads(message)
     session_id = data["id"]
