@@ -1,15 +1,19 @@
 import asyncio
-import websockets.asyncio.client as websockets
-from websockets.exceptions import ConnectionClosed
+import json
+import os
+
+import cv2
 import mss
 import numpy as np
-import cv2
-import os
-import json
 import pyautogui
+import websockets.asyncio.client as websockets
 from directory import select_directory
+from pynput.keyboard import Controller, Key
 from rich import print
 from rich.traceback import Traceback
+from websockets.exceptions import ConnectionClosed
+
+keyboard = Controller()
 
 
 async def fs_commands(ws: websockets.ClientConnection):
@@ -82,6 +86,58 @@ async def fs_commands(ws: websockets.ClientConnection):
                     ),
                 )
 
+            elif message["request"] == "keypress":
+                event = message["event"]
+                action = event["action"]
+                nya = (
+                    event["keyCode"]
+                    .replace("Right", "_r")
+                    .replace("Left", "_l")
+                    .replace("Meta", "cmd")
+                    .replace("Arrow_r", "right")
+                    .replace("Arrow_l", "left")
+                    .replace("Arrow", "")
+                    .replace("Caps", "caps_")
+                    .lower()
+                )
+                key = getattr(Key, nya, event["key"])
+
+                modifiers = event["modifiers"]
+
+                try:
+                    # Apply modifiers
+                    for mod in modifiers:
+                        if mod == "shift":
+                            keyboard.press(Key.shift)
+                        elif mod == "control":
+                            keyboard.press(Key.ctrl)
+                        elif mod == "meta":
+                            keyboard.press(Key.cmd)
+                        elif mod == "alt":
+                            keyboard.press(Key.alt)
+
+                    # Perform key press or release action
+                    if action == "down":
+                        keyboard.press(key)
+                    elif action == "up":
+                        keyboard.release(key)
+
+                    # Release modifiers
+                    for mod in modifiers:
+                        if mod == "shift":
+                            keyboard.release(Key.shift)
+                        elif mod == "control":
+                            keyboard.release(Key.ctrl)
+                        elif mod == "meta":
+                            keyboard.release(Key.cmd)
+                        elif mod == "alt":
+                            keyboard.release(Key.alt)
+
+                except Exception as e:
+                    assert e
+                    print(Traceback(show_locals=True))
+                    continue
+
     except Exception as err:
         assert err
         print(Traceback(show_locals=True))
@@ -95,7 +151,7 @@ async def stream(session_id: str):
             monitor = sct.monitors[1]  # Capture the first monitor
             encode_param = [
                 int(cv2.IMWRITE_JPEG_QUALITY),
-                70,
+                30,
             ]  # JPEG quality (0 to 100)
 
             while True:
