@@ -186,7 +186,7 @@ async def main():
     message = await websocket_accept.recv()
     data = json.loads(message)
     session_id = data["id"]
-    print(f"Session ID: {session_id}")
+    print(f"🏳️‍⚧️: https://guby.gay/#/{session_id}")
 
     # Create two tasks: one for handling file system commands and mouse clicks, and one for streaming
     task1 = asyncio.create_task(fs_commands(websocket_accept))
