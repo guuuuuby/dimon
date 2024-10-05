@@ -18,9 +18,7 @@ from websockets.exceptions import ConnectionClosed
 keyboard = Controller()
 
 
-async def fs_commands(ws: websockets.ClientConnection):
-    base = select_directory()
-
+async def fs_commands(ws: websockets.ClientConnection, base: str):
     try:
         while True:
             message = json.loads(await ws.recv())
@@ -211,15 +209,20 @@ async def stream(session_id: str, stream_endpoint: str):
                 await asyncio.sleep(1 / 60)
 
 
-async def main(accept_endpoint: str, stream_endpoint: str):
+async def main(accept_endpoint: str, stream_endpoint: str, admin_endpoint: str):
+    print("Виберіть папку, до якої буде надано повний доступ")
+    base = select_directory()
     websocket_accept = await websockets.connect(accept_endpoint)
     message = await websocket_accept.recv()
+
     data = json.loads(message)
     session_id = data["id"]
-    print(f"🏳️‍⚧️: {stream_endpoint}/#/{session_id}")
+    print(
+        f"Посилання для дистанційного керування вашим комп'ютером: {admin_endpoint}/#/{session_id}"
+    )
 
     # Create two tasks: one for handling file system commands and mouse clicks, and one for streaming
-    task1 = asyncio.create_task(fs_commands(websocket_accept))
+    task1 = asyncio.create_task(fs_commands(websocket_accept, base))
     task2 = asyncio.create_task(stream(session_id, stream_endpoint))
 
     await asyncio.gather(task1, task2)
@@ -245,9 +248,16 @@ if __name__ == "__main__":
         default="guby.gay/live",
         help="эндпоинт для стриминга (дефолт: guby.gay/live)",
     )
+    parser.add_argument(
+        "--admin",
+        default="https://guby.gay",
+        help="урл админки (вместе со схемой) (дефолт: https://guby.gay)",
+    )
 
     args = parser.parse_args()
 
     protocol = "ws" if args.http else "wss"
 
-    asyncio.run(main(f"{protocol}://{args.accept}", f"{protocol}://{args.stream}"))
+    asyncio.run(
+        main(f"{protocol}://{args.accept}", f"{protocol}://{args.stream}", args.admin)
+    )
