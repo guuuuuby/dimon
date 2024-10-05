@@ -1,6 +1,6 @@
+import ctypes
 import platform
 import subprocess
-import ctypes
 from ctypes import wintypes
 
 
