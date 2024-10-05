@@ -16,6 +16,7 @@ dependencies = [
     "pynput>=1.7.7",
     "pyrtmp>=0.3.1",
     "rich>=13.8.1",
+    "send2trash>=1.8.3",
     "uvicorn>=0.30.6",
     "websockets>=13.1",
 ]
