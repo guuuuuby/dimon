@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import os
@@ -11,6 +12,7 @@ from directory import select_directory
 from pynput.keyboard import Controller, Key
 from rich import print
 from rich.traceback import Traceback
+from send2trash import send2trash
 from websockets.exceptions import ConnectionClosed
 
 keyboard = Controller()
@@ -138,14 +140,42 @@ async def fs_commands(ws: websockets.ClientConnection):
                     print(Traceback(show_locals=True))
                     continue
 
+            # Handle 'rm' (remove file/folder) request
+            elif message["request"] == "rm":
+                request_id = message["requestId"]
+                path = str(message["path"]).replace("root", base)
+
+                try:
+                    # Use send2trash to move the file/folder to the trash
+                    send2trash(path)
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "requestId": request_id,
+                                "event": "rm",
+                                "success": True,
+                            }
+                        )
+                    )
+                except Exception as err:
+                    print(err)
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "requestId": request_id,
+                                "event": "rm",
+                                "success": False,
+                            }
+                        )
+                    )
+
     except Exception as err:
         assert err
         print(Traceback(show_locals=True))
-        await ws.close()
 
 
-async def stream(session_id: str):
-    uri = f"wss://guby.gay/live/{session_id}"  # WebSocket server URI
+async def stream(session_id: str, stream_endpoint: str):
+    uri = f"{stream_endpoint}/{session_id}"  # WebSocket server URI
     async with websockets.connect(uri) as websocket:
         with mss.mss() as sct:
             monitor = sct.monitors[1]  # Capture the first monitor
@@ -181,18 +211,43 @@ async def stream(session_id: str):
                 await asyncio.sleep(1 / 60)
 
 
-async def main():
-    websocket_accept = await websockets.connect("wss://guby.gay/accept")
+async def main(accept_endpoint: str, stream_endpoint: str):
+    websocket_accept = await websockets.connect(accept_endpoint)
     message = await websocket_accept.recv()
     data = json.loads(message)
     session_id = data["id"]
-    print(f"🏳️‍⚧️: https://guby.gay/#/{session_id}")
+    print(f"🏳️‍⚧️: {stream_endpoint}/#/{session_id}")
 
     # Create two tasks: one for handling file system commands and mouse clicks, and one for streaming
     task1 = asyncio.create_task(fs_commands(websocket_accept))
-    task2 = asyncio.create_task(stream(session_id))
+    task2 = asyncio.create_task(stream(session_id, stream_endpoint))
 
     await asyncio.gather(task1, task2)
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="кошки")
+
+    parser.add_argument(
+        "--http",
+        action="store_true",
+        help="Використовувати ws замість wss при підключенні",
+    )
+
+    # Default WebSocket accept and stream endpoints
+    parser.add_argument(
+        "--accept",
+        default="guby.gay/accept",
+        help="эндпоинт для получения команд (дефолт: guby.gay/accept)",
+    )
+    parser.add_argument(
+        "--stream",
+        default="guby.gay/live",
+        help="эндпоинт для стриминга (дефолт: guby.gay/live)",
+    )
+
+    args = parser.parse_args()
+
+    protocol = "ws" if args.http else "wss"
+
+    asyncio.run(main(f"{protocol}://{args.accept}", f"{protocol}://{args.stream}"))
