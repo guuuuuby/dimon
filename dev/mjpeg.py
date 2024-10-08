@@ -145,7 +145,7 @@ async def fs_commands(ws: websockets.ClientConnection, base: str):
 
                 try:
                     # Use send2trash to move the file/folder to the trash
-                    send2trash(path)
+                    send2trash(os.path.abspath(path))
                     await ws.send(
                         json.dumps(
                             {
