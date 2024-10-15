@@ -14,11 +14,13 @@ from rich import print
 from rich.traceback import Traceback
 from send2trash import send2trash
 from websockets.exceptions import ConnectionClosed
+from filestream import handle_download_request
+import shutil
 
 keyboard = Controller()
 
 
-async def fs_commands(ws: websockets.ClientConnection, base: str):
+async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoint: str):
     try:
         while True:
             message = json.loads(await ws.recv())
@@ -65,6 +67,10 @@ async def fs_commands(ws: websockets.ClientConnection, base: str):
                             }
                         )
                     )
+
+            # Handle 'download' request
+            elif message["request"] == "download":
+                await handle_download_request(message, base, stream_endpoint)
 
             # Handle 'mouseClick' request
             elif message["request"] == "mouseClick":
@@ -167,6 +173,35 @@ async def fs_commands(ws: websockets.ClientConnection, base: str):
                         )
                     )
 
+            elif message["request"] == "mv":
+                request_id = message["requestId"]
+                source = str(message["url"]).replace("root", base)
+                destination = str(message["destinationUrl"]).replace("root", base)
+
+                try:
+                    print(source, destination)
+                    shutil.move(source, destination)
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "requestId": request_id,
+                                "event": "mv",
+                                "success": True,
+                            }
+                        )
+                    )
+                except Exception as err:
+                    print(err)
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "requestId": request_id,
+                                "event": "mv",
+                                "success": False,
+                            }
+                        )
+                    )
+
     except Exception as err:
         assert err
         print(Traceback(show_locals=True))
@@ -222,7 +257,7 @@ async def main(accept_endpoint: str, stream_endpoint: str, admin_endpoint: str):
     )
 
     # Create two tasks: one for handling file system commands and mouse clicks, and one for streaming
-    task1 = asyncio.create_task(fs_commands(websocket_accept, base))
+    task1 = asyncio.create_task(fs_commands(websocket_accept, base, stream_endpoint))
     task2 = asyncio.create_task(stream(session_id, stream_endpoint))
 
     await asyncio.gather(task1, task2)
@@ -252,6 +287,11 @@ if __name__ == "__main__":
         "--admin",
         default="https://guby.gay",
         help="урл админки (вместе со схемой) (дефолт: https://guby.gay)",
+    )
+    parser.add_argument(
+        "--files",
+        default="guby.gay",
+        help="эндпоинт для стриминга файлов (дефолт: guby.gay)"
     )
 
     args = parser.parse_args()
