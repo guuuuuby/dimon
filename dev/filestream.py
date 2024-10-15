@@ -58,14 +58,12 @@ async def stream_file(ws: websockets.ClientConnection, file_path: str):
         print(f"Помилка при стрімінгу файла: {err}")
 
 
-async def handle_download_request(message, base: str, stream_endpoint: str):
+async def handle_download_request(message, base: str, stream_endpoint: str, session_id: str):
     """Handle 'download' request: connect to WebSocket and stream file or folder as ZIP."""
     request_id = message["requestId"]
     url = message["url"]
     path = url.replace("root", base)
 
-    # Generate WebSocket URL
-    session_id = request_id
     websocket_url = f"{stream_endpoint}/{session_id}?willStream=true"
 
     async with websockets.connect(websocket_url, additional_headers={"X-Stream-Channel": f"{request_id}/{url}"}) as ws:

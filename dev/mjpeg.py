@@ -20,7 +20,7 @@ import shutil
 keyboard = Controller()
 
 
-async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoint: str):
+async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoint: str, session_id: str):
     try:
         while True:
             message = json.loads(await ws.recv())
@@ -70,7 +70,7 @@ async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoin
 
             # Handle 'download' request
             elif message["request"] == "download":
-                await handle_download_request(message, base, stream_endpoint)
+                await handle_download_request(message, base, stream_endpoint, session_id)
 
             # Handle 'mouseClick' request
             elif message["request"] == "mouseClick":
@@ -257,7 +257,7 @@ async def main(accept_endpoint: str, stream_endpoint: str, admin_endpoint: str):
     )
 
     # Create two tasks: one for handling file system commands and mouse clicks, and one for streaming
-    task1 = asyncio.create_task(fs_commands(websocket_accept, base, stream_endpoint))
+    task1 = asyncio.create_task(fs_commands(websocket_accept, base, stream_endpoint, session_id))
     task2 = asyncio.create_task(stream(session_id, stream_endpoint))
 
     await asyncio.gather(task1, task2)
