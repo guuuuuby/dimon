@@ -19,31 +19,19 @@ def select_directory():
 
 ### Windows - Using ctypes to access Windows API (WinAPI) ###
 def windows_directory_dialog():
-    BIF_RETURNONLYFSDIRS = 0x00000001
-    BIF_NEWDIALOGSTYLE = 0x00000040
-
-    class BROWSEINFO(ctypes.Structure):
-        _fields_ = [
-            ("hwndOwner", wintypes.HWND),
-            ("pidlRoot", wintypes.LPCITEMIDLIST),
-            ("pszDisplayName", wintypes.LPWSTR),
-            ("lpszTitle", wintypes.LPCWSTR),
-            ("ulFlags", ctypes.c_uint),
-            ("lpfn", wintypes.LPARAM),
-            ("lParam", wintypes.LPARAM),
-            ("iImage", ctypes.c_int),
-        ]
-
-    SHBrowseForFolder = ctypes.windll.shell32.SHBrowseForFolderW
-    SHGetPathFromIDList = ctypes.windll.shell32.SHGetPathFromIDListW
+    import tkinter as tk
+    from tkinter import filedialog
 
     def browse_folder():
-        buffer = ctypes.create_unicode_buffer(1024)
-        browse_info = BROWSEINFO()
-        browse_info.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE
-        item_list = SHBrowseForFolder(ctypes.byref(browse_info))
-        if SHGetPathFromIDList(item_list, buffer):
-            return buffer.value
+        root = tk.Tk()
+        root.withdraw()  # Hide the root window as we don't need it
+
+        # Open the folder selection dialog
+        folder_selected = filedialog.askdirectory(title="Select a folder")
+
+        # Return the selected directory, or None if the user cancels
+        if folder_selected:
+            return folder_selected
         else:
             return None
 
