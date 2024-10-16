@@ -66,7 +66,7 @@ async def handle_download_request(message, base: str, stream_endpoint: str, sess
 
     websocket_url = f"{stream_endpoint}/{session_id}"
 
-    async with websockets.connect(websocket_url, additional_headers={"X-Stream-Channel": f"{request_id}/{url}"}) as ws:
+    async with websockets.connect(websocket_url, additional_headers={"X-Stream-Channel": request_id}) as ws:
         # Если это файл, стримим файл
         if os.path.isfile(path):
             await stream_file(ws, path)
