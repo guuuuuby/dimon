@@ -64,7 +64,7 @@ async def handle_download_request(message, base: str, stream_endpoint: str, sess
     url = message["url"]
     path = url.replace("root", base)
 
-    websocket_url = f"{stream_endpoint}/{session_id}?willStream=true"
+    websocket_url = f"{stream_endpoint}/{session_id}"
 
     async with websockets.connect(websocket_url, additional_headers={"X-Stream-Channel": f"{request_id}/{url}"}) as ws:
         # Если это файл, стримим файл
