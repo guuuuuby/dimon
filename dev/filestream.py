@@ -5,40 +5,39 @@ import os
 
 
 async def stream_zip_directory(ws: websockets.ClientConnection, folder_path: str):
-    """Stream a folder as a zip archive over WebSocket in chunks."""
+    """Stream a folder as a zip archive over WebSocket in chunks, after pre-calculating the size."""
     try:
         # Создаем временный буфер для zip-архива
         with io.BytesIO() as zip_buffer:
+            # Write the zip archive to the buffer
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 # Проходимся по файлам в директории и добавляем их в архив
                 for root, dirs, files in os.walk(folder_path):
                     for file in files:
                         file_path = os.path.join(root, file)
-                        archive_name = os.path.relpath(file_path, folder_path)  # относительный путь в архиве
+                        archive_name = os.path.relpath(file_path, folder_path)  # relative path inside the archive
                         zip_file.write(file_path, arcname=archive_name)
 
-                        # Flush the current state of the ZIP buffer and send the current chunk
-                        zip_buffer.seek(0, io.SEEK_END)
-                        current_size = zip_buffer.tell()
-                        if current_size > 0:
-                            zip_buffer.seek(0)
-                            chunk = zip_buffer.read(current_size)
-                            await ws.send(chunk)
-                            zip_buffer.seek(0)
-                            zip_buffer.truncate(0)  # очищаем буфер для следующего чанка
+            # Get the size of the entire zip archive
+            zip_buffer.seek(0, io.SEEK_END)
+            total_size = zip_buffer.tell()
+            await ws.send(str(total_size))
 
-                # Закрываем zip и отправляем финальный кусок архива
-                zip_buffer.seek(0, io.SEEK_END)
-                final_size = zip_buffer.tell()
-                if final_size > 0:
-                    zip_buffer.seek(0)
-                    await ws.send(zip_buffer.read(final_size))
+            # Reset the buffer's position to the beginning before streaming
+            zip_buffer.seek(0)
+
+            # Stream the archive in chunks over the WebSocket
+            chunk_size = 1024 * 1024  # 1 MB chunks
+            while True:
+                chunk = zip_buffer.read(chunk_size)
+                if not chunk:
+                    break
+                await ws.send(chunk)
 
         print(f"Теку {folder_path} відправлено на сервер.")
 
     except Exception as err:
         print(f"Помилка при стрімінгу zip архіва: {err}")
-
 
 async def stream_file(ws: websockets.ClientConnection, file_path: str):
     """Stream file in chunks over WebSocket."""

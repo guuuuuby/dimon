@@ -288,11 +288,6 @@ if __name__ == "__main__":
         default="https://guby.gay",
         help="урл админки (вместе со схемой) (дефолт: https://guby.gay)",
     )
-    parser.add_argument(
-        "--files",
-        default="guby.gay",
-        help="эндпоинт для стриминга файлов (дефолт: guby.gay)"
-    )
 
     args = parser.parse_args()
 
