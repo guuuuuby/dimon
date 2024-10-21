@@ -1,7 +1,8 @@
 import io
-import websockets.asyncio.client as websockets
-import zipfile
 import os
+import zipfile
+
+import websockets.asyncio.client as websockets
 
 
 async def stream_zip_directory(ws: websockets.ClientConnection, folder_path: str):
@@ -10,12 +11,14 @@ async def stream_zip_directory(ws: websockets.ClientConnection, folder_path: str
         # Создаем временный буфер для zip-архива
         with io.BytesIO() as zip_buffer:
             # Write the zip archive to the buffer
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                 # Проходимся по файлам в директории и добавляем их в архив
                 for root, dirs, files in os.walk(folder_path):
                     for file in files:
                         file_path = os.path.join(root, file)
-                        archive_name = os.path.relpath(file_path, folder_path)  # relative path inside the archive
+                        archive_name = os.path.relpath(
+                            file_path, folder_path
+                        )  # relative path inside the archive
                         zip_file.write(file_path, arcname=archive_name)
 
             # Get the size of the entire zip archive
@@ -39,6 +42,7 @@ async def stream_zip_directory(ws: websockets.ClientConnection, folder_path: str
     except Exception as err:
         print(f"Помилка при стрімінгу zip архіва: {err}")
 
+
 async def stream_file(ws: websockets.ClientConnection, file_path: str):
     """Stream file in chunks over WebSocket."""
     try:
@@ -57,7 +61,9 @@ async def stream_file(ws: websockets.ClientConnection, file_path: str):
         print(f"Помилка при стрімінгу файла: {err}")
 
 
-async def handle_download_request(message, base: str, stream_endpoint: str, session_id: str):
+async def handle_download_request(
+    message, base: str, stream_endpoint: str, session_id: str
+):
     """Handle 'download' request: connect to WebSocket and stream file or folder as ZIP."""
     request_id = message["requestId"]
     url = message["url"]
@@ -65,7 +71,9 @@ async def handle_download_request(message, base: str, stream_endpoint: str, sess
 
     websocket_url = f"{stream_endpoint}/{session_id}"
 
-    async with websockets.connect(websocket_url, additional_headers={"X-Stream-Channel": request_id}) as ws:
+    async with websockets.connect(
+        websocket_url, additional_headers={"X-Stream-Channel": request_id}
+    ) as ws:
         # Если это файл, стримим файл
         if os.path.isfile(path):
             await stream_file(ws, path)

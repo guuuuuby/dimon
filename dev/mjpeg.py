@@ -2,6 +2,8 @@ import argparse
 import asyncio
 import json
 import os
+import shutil
+from datetime import datetime
 
 import cv2
 import mss
@@ -9,30 +11,32 @@ import numpy as np
 import pyautogui
 import websockets.asyncio.client as websockets
 from directory import select_directory
+from filestream import handle_download_request
 from pynput.keyboard import Controller, Key
 from rich import print
-from datetime import datetime
 from rich.traceback import Traceback
 from send2trash import send2trash
 from websockets.exceptions import ConnectionClosed
-from filestream import handle_download_request
-import shutil
 
 keyboard = Controller()
+
 
 def get_creation_time(path: str) -> str:
     try:
         stat_info = os.stat(path)
-        if hasattr(stat_info, 'st_birthtime'):
+        if hasattr(stat_info, "st_birthtime"):
             creation_time = stat_info.st_birthtime
         else:
             creation_time = stat_info.st_ctime
         creation_time_dt = datetime.fromtimestamp(creation_time)
-        return creation_time_dt.isoformat()    
+        return creation_time_dt.isoformat()
     except Exception as e:
         return str(e)
 
-async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoint: str, session_id: str):
+
+async def fs_commands(
+    ws: websockets.ClientConnection, base: str, stream_endpoint: str, session_id: str
+):
     try:
         while True:
             message = json.loads(await ws.recv())
@@ -49,10 +53,14 @@ async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoin
                                     "type": "file",
                                     "name": entry,
                                     "bytes": os.path.getsize(f"{path}/{entry}"),
-                                    "createdAt": get_creation_time(f"{path}/{entry}")
+                                    "createdAt": get_creation_time(f"{path}/{entry}"),
                                 }
                                 if os.path.isfile(f"{path}/{entry}")
-                                else {"type": "folder", "name": entry, "createdAt": get_creation_time(f"{path}/{entry}")}
+                                else {
+                                    "type": "folder",
+                                    "name": entry,
+                                    "createdAt": get_creation_time(f"{path}/{entry}"),
+                                }
                             )
                             for entry in os.listdir(path)
                         ],
@@ -83,7 +91,9 @@ async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoin
 
             # Handle 'download' request
             elif message["request"] == "download":
-                await handle_download_request(message, base, stream_endpoint, session_id)
+                await handle_download_request(
+                    message, base, stream_endpoint, session_id
+                )
 
             # Handle 'mouseClick' request
             elif message["request"] == "mouseClick":
@@ -270,7 +280,9 @@ async def main(accept_endpoint: str, stream_endpoint: str, admin_endpoint: str):
     )
 
     # Create two tasks: one for handling file system commands and mouse clicks, and one for streaming
-    task1 = asyncio.create_task(fs_commands(websocket_accept, base, stream_endpoint, session_id))
+    task1 = asyncio.create_task(
+        fs_commands(websocket_accept, base, stream_endpoint, session_id)
+    )
     task2 = asyncio.create_task(stream(session_id, stream_endpoint))
 
     await asyncio.gather(task1, task2)

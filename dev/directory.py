@@ -1,7 +1,5 @@
-import ctypes
 import platform
 import subprocess
-from ctypes import wintypes
 
 
 def select_directory():
