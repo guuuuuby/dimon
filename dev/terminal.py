@@ -26,15 +26,13 @@ def select_shell():
 
 
 class TerminalSession:
-    def __init__(
-        self,
-        ws: websockets.WebSocketClientProtocol,
-    ):
+    def __init__(self, ws: websockets.WebSocketClientProtocol):
         self.ws = ws
         self.process = None
         self.read_task = None
         self.write_task = None
         self.active = False
+        self.master_fd = None  # Add this attribute to store master_fd
 
     async def start(self, columns: int, lines: int):
         """Start the shell subprocess within a PTY and initiate data forwarding."""
@@ -42,33 +40,37 @@ class TerminalSession:
         print(f"Starting shell: {shell}")
 
         system = platform.system()
-        if system == "Windows":
-            # Initialize PTY on Windows using pywinpty
+        if system == 'Windows':
+            # Existing Windows implementation...
             self.process = winpty.PTYProcess.spawn(shell)
             self.active = True
-            # Start reading and writing
             self.read_task = asyncio.create_task(self.read_from_shell_windows())
             self.write_task = asyncio.create_task(self.write_to_shell_windows())
         else:
             # Initialize PTY on Unix-like systems
-            master_fd, slave_fd = pty.openpty()
+            self.master_fd, slave_fd = pty.openpty()
             self.process = await asyncio.create_subprocess_exec(
                 shell,
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,
-                preexec_fn=os.setsid,
+                preexec_fn=os.setsid
             )
             self.active = True
 
             # Start reading and writing
-            self.read_task = asyncio.create_task(self.read_from_shell_unix(master_fd))
-            self.write_task = asyncio.create_task(self.write_to_shell_unix(master_fd))
+            self.read_task = asyncio.create_task(self.read_from_shell_unix(self.master_fd))
+            self.write_task = asyncio.create_task(self.write_to_shell_unix(self.master_fd))
+
+            await self.set_terminal_size(columns, lines)
 
     async def set_terminal_size(self, columns: int, lines: int):
         """Set the terminal size of the subprocess."""
         system = platform.system()
-        if system == "Windows":
+        if system == 'Windows':
+            # pywinpty does not natively support resizing in the same way as Unix PTYs.
+            # Advanced implementations may require additional handling.
+            # Placeholder for potential future enhancements.
             pass
         else:
             # Use ioctl to set terminal size on Unix-like systems
@@ -77,11 +79,12 @@ class TerminalSession:
             import termios
 
             try:
-                # Get the file descriptor
-                master_fd = self.process.stdout.fileno()
-                # Pack the terminal size into the required format
-                size = struct.pack("HHHH", lines, columns, 0, 0)
-                fcntl.ioctl(master_fd, termios.TIOCSWINSZ, size)
+                if self.master_fd is not None:
+                    # Pack the terminal size into the required format
+                    size = struct.pack("HHHH", lines, columns, 0, 0)
+                    fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, size)
+                else:
+                    print("master_fd is not set. Cannot set terminal size.")
             except Exception as e:
                 print(f"Error setting terminal size: {e}")
 
