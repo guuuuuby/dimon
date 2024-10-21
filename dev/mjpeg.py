@@ -11,6 +11,7 @@ import websockets.asyncio.client as websockets
 from directory import select_directory
 from pynput.keyboard import Controller, Key
 from rich import print
+from datetime import datetime
 from rich.traceback import Traceback
 from send2trash import send2trash
 from websockets.exceptions import ConnectionClosed
@@ -19,6 +20,17 @@ import shutil
 
 keyboard = Controller()
 
+def get_creation_time(path: str) -> str:
+    try:
+        stat_info = os.stat(path)
+        if hasattr(stat_info, 'st_birthtime'):
+            creation_time = stat_info.st_birthtime
+        else:
+            creation_time = stat_info.st_ctime
+        creation_time_dt = datetime.fromtimestamp(creation_time)
+        return creation_time_dt.isoformat()    
+    except Exception as e:
+        return str(e)
 
 async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoint: str, session_id: str):
     try:
@@ -37,9 +49,10 @@ async def fs_commands(ws: websockets.ClientConnection, base: str, stream_endpoin
                                     "type": "file",
                                     "name": entry,
                                     "bytes": os.path.getsize(f"{path}/{entry}"),
+                                    "createdAt": get_creation_time(f"{path}/{entry}")
                                 }
                                 if os.path.isfile(f"{path}/{entry}")
-                                else {"type": "folder", "name": entry}
+                                else {"type": "folder", "name": entry, "createdAt": get_creation_time(f"{path}/{entry}")}
                             )
                             for entry in os.listdir(path)
                         ],
