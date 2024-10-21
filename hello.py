@@ -1,5 +1,8 @@
+import os
+
+
 def main():
-    print("Hello from dimon!")
+    print(f"Hello from {os.getlogin()}!")
 
 
 if __name__ == "__main__":
