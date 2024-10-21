@@ -239,7 +239,6 @@ async def fs_commands(
                 print(f"Received terminal action: {action}")
                 if action == "open":
                     if terminal_session and terminal_session.active:
-                        # If a terminal session is already active, close it first
                         await terminal_session.close()
 
                     columns = event.get("columns", 80)
@@ -266,7 +265,11 @@ async def fs_commands(
 
                 elif action == "close":
                     if terminal_session and terminal_session.active:
-                        await terminal_session.close()
+                        try:
+                            await terminal_session.close()
+                        except Exception as e:
+                            print(f"Failed to close terminal session: {e}")
+                            assert e
                         terminal_session = None
 
     except Exception as err:

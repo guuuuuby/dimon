@@ -155,11 +155,7 @@ class TerminalSession:
         if self.active:
             self.active = False
             try:
-                if platform.system() == "Windows":
-                    self.process.terminate()
-                else:
-                    self.process.terminate()
-                    await self.process.wait()
+                self.process.terminate()
             except Exception as e:
                 assert e
                 print(Traceback(show_locals=True))
