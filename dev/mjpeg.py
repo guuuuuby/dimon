@@ -9,7 +9,7 @@ import cv2
 import mss
 import numpy as np
 import pyautogui
-import websockets.asyncio.client as websockets
+import websockets
 from directory import select_directory
 from filestream import handle_download_request
 from pynput.keyboard import Controller, Key
@@ -17,6 +17,8 @@ from rich import print
 from rich.traceback import Traceback
 from send2trash import send2trash
 from websockets.exceptions import ConnectionClosed
+from terminal import TerminalSession
+
 
 keyboard = Controller()
 
@@ -35,8 +37,12 @@ def get_creation_time(path: str) -> str:
 
 
 async def fs_commands(
-    ws: websockets.ClientConnection, base: str, stream_endpoint: str, session_id: str
+    ws: websockets.WebSocketClientProtocol,
+    base: str,
+    stream_endpoint: str,
+    session_id: str,
 ):
+    terminal_session = None
     try:
         while True:
             message = json.loads(await ws.recv())
@@ -225,9 +231,49 @@ async def fs_commands(
                         )
                     )
 
+            elif message["request"] == "terminal":
+                # Handle terminal events
+                event = message.get("event", {})
+                action = event.get("action")
+
+                print(f"Received terminal action: {action}")
+                if action == "open":
+                    if terminal_session and terminal_session.active:
+                        # If a terminal session is already active, close it first
+                        await terminal_session.close()
+
+                    columns = event.get("columns", 80)
+                    lines = event.get("lines", 24)
+
+                    # Establish a new WebSocket connection for terminal
+                    terminal_uri = f"{stream_endpoint}/{session_id}?channel=terminal"
+
+                    try:
+                        terminal_ws = await websockets.connect(terminal_uri)
+                        print(f"Connected to terminal WebSocket at {terminal_uri}")
+                        terminal_session = TerminalSession(terminal_ws)
+                        await terminal_session.start(columns, lines)
+
+                    except Exception as e:
+                        print(f"Failed to connect to terminal WebSocket: {e}")
+
+                elif action == "sync":
+                    if terminal_session and terminal_session.active:
+                        columns = event.get("columns")
+                        lines = event.get("lines")
+                        if columns and lines:
+                            await terminal_session.set_terminal_size(columns, lines)
+
+                elif action == "close":
+                    if terminal_session and terminal_session.active:
+                        await terminal_session.close()
+                        terminal_session = None
+
     except Exception as err:
         assert err
         print(Traceback(show_locals=True))
+        if terminal_session and terminal_session.active:
+            await terminal_session.close()
 
 
 async def stream(session_id: str, stream_endpoint: str):
@@ -263,7 +309,7 @@ async def stream(session_id: str, stream_endpoint: str):
                     print("Connection closed")
                     websocket = await websockets.connect(uri)
 
-                # Control frame rate (e.g., 15 FPS)
+                # Control frame rate (e.g., 60 FPS)
                 await asyncio.sleep(1 / 60)
 
 
@@ -279,7 +325,7 @@ async def main(accept_endpoint: str, stream_endpoint: str, admin_endpoint: str):
         f"Посилання для дистанційного керування вашим комп'ютером: {admin_endpoint}/#/{session_id}"
     )
 
-    # Create two tasks: one for handling file system commands and mouse clicks, and one for streaming
+    # Create tasks for handling file system commands and streaming
     task1 = asyncio.create_task(
         fs_commands(websocket_accept, base, stream_endpoint, session_id)
     )
