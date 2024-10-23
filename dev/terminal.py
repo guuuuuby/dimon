@@ -42,7 +42,7 @@ class TerminalSession:
         system = platform.system()
         if system == 'Windows':
             # Existing Windows implementation...
-            self.process = winpty.PTYProcess.spawn(shell)
+            self.process = winpty.PtyProcess.spawn(shell)
             self.active = True
             self.read_task = asyncio.create_task(self.read_from_shell_windows())
             self.write_task = asyncio.create_task(self.write_to_shell_windows())
