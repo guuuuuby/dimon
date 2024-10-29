@@ -19,7 +19,6 @@ from send2trash import send2trash
 from websockets.exceptions import ConnectionClosed
 from terminal import TerminalSession
 
-
 keyboard = Controller()
 
 
@@ -41,6 +40,7 @@ async def fs_commands(
     base: str,
     stream_endpoint: str,
     session_id: str,
+    shell: str | None,
 ):
     terminal_session = None
     try:
@@ -250,7 +250,7 @@ async def fs_commands(
                     try:
                         terminal_ws = await websockets.connect(terminal_uri)
                         print(f"Connected to terminal WebSocket at {terminal_uri}")
-                        terminal_session = TerminalSession(terminal_ws)
+                        terminal_session = TerminalSession(terminal_ws, base, shell)
                         await terminal_session.start(columns, lines)
 
                     except Exception as e:
@@ -316,7 +316,9 @@ async def stream(session_id: str, stream_endpoint: str):
                 await asyncio.sleep(1 / 60)
 
 
-async def main(accept_endpoint: str, stream_endpoint: str, admin_endpoint: str):
+async def main(
+    accept_endpoint: str, stream_endpoint: str, admin_endpoint: str, shell: str | None
+):
     print("Виберіть папку, до якої буде надано повний доступ")
     base = select_directory()
     websocket_accept = await websockets.connect(accept_endpoint)
@@ -330,7 +332,7 @@ async def main(accept_endpoint: str, stream_endpoint: str, admin_endpoint: str):
 
     # Create tasks for handling file system commands and streaming
     task1 = asyncio.create_task(
-        fs_commands(websocket_accept, base, stream_endpoint, session_id)
+        fs_commands(websocket_accept, base, stream_endpoint, session_id, shell)
     )
     task2 = asyncio.create_task(stream(session_id, stream_endpoint))
 
@@ -344,6 +346,11 @@ if __name__ == "__main__":
         "--http",
         action="store_true",
         help="Використовувати ws замість wss при підключенні",
+    )
+    parser.add_argument(
+        "--shell",
+        default=None,
+        help="Власна команда для запуску терміналу",
     )
 
     # Default WebSocket accept and stream endpoints
@@ -368,5 +375,10 @@ if __name__ == "__main__":
     protocol = "ws" if args.http else "wss"
 
     asyncio.run(
-        main(f"{protocol}://{args.accept}", f"{protocol}://{args.stream}", args.admin)
+        main(
+            f"{protocol}://{args.accept}",
+            f"{protocol}://{args.stream}",
+            args.admin,
+            args.shell,
+        )
     )

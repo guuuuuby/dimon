@@ -26,8 +26,15 @@ def select_shell():
 
 
 class TerminalSession:
-    def __init__(self, ws: websockets.WebSocketClientProtocol):
+    def __init__(
+        self,
+        ws: websockets.WebSocketClientProtocol,
+        base_dir: str,
+        shell: str | None = None,
+    ):
         self.ws = ws
+        self.base_dir = base_dir
+        self.shell = shell
         self.process = None
         self.read_task = None
         self.write_task = None
@@ -37,37 +44,71 @@ class TerminalSession:
     async def start(self, columns: int, lines: int):
         """Start the shell subprocess within a PTY and initiate data forwarding."""
         shell = select_shell()
-        print(f"Starting shell: {shell}")
+        print(f"Starting shell: {shell if not self.shell else self.shell}")
 
         system = platform.system()
-        if system == 'Windows':
+        if system == "Windows":
             # Existing Windows implementation...
             self.process = winpty.PTYProcess.spawn(shell)
             self.active = True
             self.read_task = asyncio.create_task(self.read_from_shell_windows())
             self.write_task = asyncio.create_task(self.write_to_shell_windows())
         else:
-            # Initialize PTY on Unix-like systems
+
+            def preexec():
+                os.chdir(self.base_dir)
+                os.setsid()
+                import resource
+
+                resource.setrlimit(resource.RLIMIT_NOFILE, (32, 32))  # Max open files
+                os.environ["PATH"] = "/bin:/usr/bin"
+                os.environ["HOME"] = self.base_dir
+
+            def preexec_nojail():
+                os.chdir(self.base_dir)
+                os.setsid()
+
             self.master_fd, slave_fd = pty.openpty()
-            self.process = await asyncio.create_subprocess_exec(
-                shell,
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                preexec_fn=os.setsid
-            )
+            if self.shell:
+                self.process = await asyncio.create_subprocess_exec(
+                    self.shell,
+                    stdin=slave_fd,
+                    stdout=slave_fd,
+                    stderr=slave_fd,
+                    preexec_fn=preexec_nojail,
+                )
+            else:
+                self.process = await asyncio.create_subprocess_exec(
+                    shell,
+                    "-c",
+                    f"exec {shell} -r",
+                    stdin=slave_fd,
+                    stdout=slave_fd,
+                    stderr=slave_fd,
+                    preexec_fn=preexec,
+                )
             self.active = True
 
             # Start reading and writing
-            self.read_task = asyncio.create_task(self.read_from_shell_unix(self.master_fd))
-            self.write_task = asyncio.create_task(self.write_to_shell_unix(self.master_fd))
+            self.read_task = asyncio.create_task(
+                self.read_from_shell_unix(self.master_fd)
+            )
+            self.write_task = asyncio.create_task(
+                self.write_to_shell_unix(self.master_fd)
+            )
 
             await self.set_terminal_size(columns, lines)
+
+        await self.set_title(shell if not self.shell else self.shell)
+
+    async def set_title(self, title: str):
+        await self.ws.send(b"\033[2J\x1b[A\x1b[A")
+        await self.ws.send(f"\033]0;{title}\007".encode("utf-8", errors="ignore"))
 
     async def set_terminal_size(self, columns: int, lines: int):
         """Set the terminal size of the subprocess."""
         system = platform.system()
-        if system == 'Windows':
+        if system == "Windows":
             # pywinpty does not natively support resizing in the same way as Unix PTYs.
             # Advanced implementations may require additional handling.
             # Placeholder for potential future enhancements.
