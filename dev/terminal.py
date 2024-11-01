@@ -48,8 +48,8 @@ class TerminalSession:
 
         system = platform.system()
         if system == "Windows":
-            # Existing Windows implementation...
-            self.process = winpty.PtyProcess.spawn(shell)
+            self.process = winpty.PTY(columns, lines)
+            self.process.spawn(shell if not self.shell else self.shell)  # noqa
             self.active = True
             self.read_task = asyncio.create_task(self.read_from_shell_windows())
             self.write_task = asyncio.create_task(self.write_to_shell_windows())
@@ -109,10 +109,7 @@ class TerminalSession:
         """Set the terminal size of the subprocess."""
         system = platform.system()
         if system == "Windows":
-            # pywinpty does not natively support resizing in the same way as Unix PTYs.
-            # Advanced implementations may require additional handling.
-            # Placeholder for potential future enhancements.
-            pass
+            self.process.set_size(columns, lines)
         else:
             # Use ioctl to set terminal size on Unix-like systems
             import fcntl
@@ -169,8 +166,9 @@ class TerminalSession:
             while True:
                 data = self.process.read(1024)
                 if not data:
-                    break
-                await self.ws.send(data)
+                    await asyncio.sleep(0.1)
+                    continue
+                await self.ws.send(data.encode("utf-8", errors="ignore"))
         except Exception as e:
             assert e
             print(Traceback(show_locals=True))
@@ -182,10 +180,10 @@ class TerminalSession:
         try:
             async for message in self.ws:
                 if isinstance(message, bytes):
-                    data = message
+                    data = message.decode("utf-8", errors="ignore")
                 else:
-                    data = message.encode("utf-8", errors="ignore")
-                self.process.write(data)
+                    data = message
+                self.process.write(data)  # noqa
         except ConnectionClosed:
             print("WebSocket connection closed.")
         except Exception as e:
@@ -199,7 +197,10 @@ class TerminalSession:
         if self.active:
             self.active = False
             try:
-                self.process.terminate()
+                if hasattr(self.process, "terminate"):
+                    self.process.terminate()
+                else:
+                    del self.process
             except Exception as e:
                 assert e
                 print(Traceback(show_locals=True))
