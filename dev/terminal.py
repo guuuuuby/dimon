@@ -49,7 +49,7 @@ class TerminalSession:
         system = platform.system()
         if system == "Windows":
             self.process = winpty.PTY(columns, lines)
-            self.process.spawn(shell if not self.shell else self.shell)  # noqa
+            self.process.spawn(shell if not self.shell else self.shell, cwd=self.base_dir)  # noqa
             self.active = True
             self.read_task = asyncio.create_task(self.read_from_shell_windows())
             self.write_task = asyncio.create_task(self.write_to_shell_windows())
