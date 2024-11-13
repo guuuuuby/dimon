@@ -317,10 +317,12 @@ async def stream(session_id: str, stream_endpoint: str):
 
 
 async def main(
-    accept_endpoint: str, stream_endpoint: str, admin_endpoint: str, shell: str | None
+    accept_endpoint: str, stream_endpoint: str, admin_endpoint: str, shell: str | None, folder: str | None
 ):
-    print("Виберіть папку, до якої буде надано повний доступ")
-    base = select_directory()
+    if folder is None:
+        print("Виберіть папку, до якої буде надано повний доступ")
+
+    base = folder or select_directory()
     websocket_accept = await websockets.connect(accept_endpoint)
     message = await websocket_accept.recv()
 
@@ -369,6 +371,8 @@ if __name__ == "__main__":
         default="https://guby.gay",
         help="урл админки (вместе со схемой) (дефолт: https://guby.gay)",
     )
+    
+    parser.add_argument("--folder", default=None, help="m")
 
     args = parser.parse_args()
 
@@ -380,5 +384,6 @@ if __name__ == "__main__":
             f"{protocol}://{args.stream}",
             args.admin,
             args.shell,
+            args.folder
         )
     )
